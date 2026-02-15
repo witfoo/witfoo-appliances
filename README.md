@@ -87,6 +87,7 @@ This will guide you through selecting the role for this appliance.
 | [Documentation](https://docs.witfoo.com/) | Open | All WitFoo Product, API, MCP, and User Documentation |
 | [Discussions](https://github.com/witfoo/witfoo-appliances/discussions) | GitHub Account | Public conversations on WitFoo Products |
 | [Downloads](https://github.com/witfoo/witfoo-appliances) | Open | Download or Launch WitFoo Appliances |
+| [Release Notes](https://github.com/witfoo/release-notes) | Open | WitFoo product release notes and changelogs |
 | [Demo](https://demo.witfoo.com) | Open | Live demo of WitFoo Analytics Platform |
 | [Open Ticket](https://witfoo.zendesk.com/hc/en-us/requests/new) | Open | Open a (private) ticket with the WitFoo team. Can be product or business related. |
 | [Training](https://witfoo.myabsorb.com/) | Free Registration (click Sign Up) | Official WitFoo training courses for users, engineers, and partners. Include WitFoo Certifications (upon passing exams.) |
