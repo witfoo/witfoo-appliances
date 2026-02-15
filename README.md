@@ -1,52 +1,81 @@
-# WitFoo VM Appliance Images
+# Install WitFoo Software
 
-Pre-built VM images for WitFoo Analytics platform deployment.
+WitFoo software is available for trial in multiple configurations. WitFoo software is always deployed to a **WitFoo Appliance**. Running `sudo wfa configure` will select the function the specific appliance will execute.
 
-## Available Formats
+Self-paced, no-cost training and certification is available here: [https://witfoo.myabsorb.com/](https://witfoo.myabsorb.com/)
 
-| Format | Platform | File Extension |
-|--------|----------|---------------|
-| QCOW2 | KVM/QEMU/OpenStack | `.qcow2.zip` |
-| VMDK | VMware ESXi/vSphere | `.vmdk.zip` |
-| VHDX | Microsoft Hyper-V | `.vhdx.zip` |
+Support is available at [Submit a request](https://witfoo.zendesk.com/hc/en-us/requests/new)
 
-## Download
+---
 
-Download images from [Releases](https://github.com/witfoo/witfoo-appliances/releases).
+## On-Prem Hypervisor Install Files
+
+| Platform | Download |
+|----------|----------|
+| <img src="logos/vmware.png" alt="VMware" width="200"> | [WitFoo Appliance Ubuntu 24 for VMware](https://github.com/witfoo/witfoo-appliances/releases/latest) |
+| <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [WitFoo Appliance Ubuntu 24 for Hyper-V](https://github.com/witfoo/witfoo-appliances/releases/latest) |
+| <img src="logos/qemu.png" alt="QEMU" width="200"> | [WitFoo Appliance Ubuntu 24 for QEMU](https://github.com/witfoo/witfoo-appliances/releases/latest) |
+
+## Cloud Marketplace Installs
+
+| Platform | Marketplace |
+|----------|-------------|
+| <a href="https://aws.amazon.com/marketplace/search/results?searchTerms=witfoo"><img src="logos/aws.png" alt="AWS" width="200"></a> | [WitFoo Appliance Ubuntu 24 for AWS](https://aws.amazon.com/marketplace/search/results?searchTerms=witfoo) |
+| <a href="https://azuremarketplace.microsoft.com/en-us/marketplace/apps?search=witfoo&page=1"><img src="logos/azure.png" alt="Azure" width="200"></a> | [WitFoo Appliance Ubuntu 24 for Azure Cloud](https://azuremarketplace.microsoft.com/en-us/marketplace/apps?search=witfoo&page=1) |
+| <a href="https://console.cloud.google.com/marketplace/browse?q=witfoo"><img src="logos/google.png" alt="Google Cloud" width="200"></a> | [WitFoo Appliance Ubuntu 24 for Google Cloud](https://console.cloud.google.com/marketplace/browse?q=witfoo) |
+
+## Bare Metal Install Files
+
+| Platform | Script |
+|----------|--------|
+| Ubuntu 24 | [ubuntu-install.sh](ubuntu-install.sh) |
+| RHEL 10 | [rhel-install.sh](rhel-install.sh) |
+
+---
+
+## WitFoo Appliance Roles
+
+| WitFoo Role | CPU Cores (minimum) | RAM (minimum) | Installation Guides |
+|-------------|---------------------|---------------|---------------------|
+| Conductor | 4 CPU | 8GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/45699743001235-Configuring-Conductor-with-license) / [without license](https://witfoo.zendesk.com/hc/en-us/articles/45191358366611-Configuring-Conductor-without-license) |
+| Reporter | 8 CPU | 32GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46410473880467-Configuring-Reporter-with-license) / [without license](https://witfoo.zendesk.com/hc/en-us/articles/46410307000339-Configuring-Reporter-without-license) |
+| Console | 4 CPU | 8GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46412264771219-Configure-Console-with-license) / [without license](https://witfoo.zendesk.com/hc/en-us/articles/46412421655571-Configure-Console-without-license) |
+| Precinct All-In-One | 8 CPU | 32GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46337323517075-Precinct-AIO-Configuration-with-license) |
+| Precinct Data Node | 4 CPU | 12GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46411002510483-Configure-WitFoo-Analytics-Data-Node-with-license) |
+| Precinct Streamer Node | 4 CPU | 12GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46192215765267-Configure-WitFoo-Analytics-Streamer-Node-with-license) |
+| Precinct Mgmt Node | 4 CPU | 8GB | [with license](https://witfoo.zendesk.com/hc/en-us/articles/46411467686419-Configure-WitFoo-Analytics-Mgmt-Node-with-license) |
+
+---
 
 ## Default Credentials
 
 - **Username**: `witfooadmin`
 - **Password**: `F00theN0ise!`
-- **Sudo**: NOPASSWD access
 
 Change these immediately after first login.
 
-## Partition Layout
+## Disk Partition Layout
 
-| Mount Point | Size | Purpose |
-|-------------|------|---------|
-| /boot | 1 GB | Boot partition |
-| / | 30 GB | Root filesystem |
-| /docker | 30 GB | Docker data-root |
-| /var/log | 5 GB | System logs |
-| /var/log/audit | 5 GB | Audit logs |
-| /data | 200 GB | Application data |
+All appliance images use LVM with the following partition layout:
 
-## First-Time Setup
+| Partition | Mount Point | Size | Purpose |
+|-----------|-------------|------|---------|
+| /boot | /boot | 1GB | Boot partition |
+| lv_root | / | 30GB | Root filesystem |
+| lv_docker | /docker | 30GB | Docker data-root |
+| lv_var_log | /var/log | 5GB | System logs |
+| lv_var_log_audit | /var/log/audit | 5GB | Audit logs |
+| lv_cassandra_commit | /cassandra_commit | 10GB | Cassandra commit log |
+| lv_data | /data | ~190GB | Application data |
 
-After deploying the VM:
+**Total disk size**: ~280GB
+
+## Configuration
+
+After deploying the appliance, run:
 
 ```bash
-# Login as witfooadmin
-# Run the setup wizard
 sudo wfa configure
 ```
 
-## Image Verification
-
-Each release includes `SHA256SUMS` for integrity verification:
-
-```bash
-sha256sum -c SHA256SUMS
-```
+This will guide you through selecting the role for this appliance.
