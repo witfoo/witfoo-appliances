@@ -56,6 +56,6 @@ dnf install -y wfa wfa-helper
 
 # Update CA Trust with WitFoo CA
 echo "Updating CA Trust with WitFoo CA"
-curl https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt -k | base64 -d > /witfooprecinct/witfoo_ca_2024.crt
-cp /witfooprecinct/witfoo_ca_2024.crt /etc/pki/ca-trust/source/anchors/
+curl https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt -k | base64 -d > /witfoo/witfoo_ca_2024.crt
+cp /witfoo/witfoo_ca_2024.crt /etc/pki/ca-trust/source/anchors/
 update-ca-trust

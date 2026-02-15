@@ -59,6 +59,6 @@ service docker restart
 
 # Download and decode the cert
 echo "Downloading and decoding WitFoo CA certificate"
-curl https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt -k | base64 -d > /witfooprecinct/witfoo_ca_2024.crt
-cp /witfooprecinct/witfoo_ca_2024.crt /usr/local/share/ca-certificates/witfoo_ca_2024.crt
+curl https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt -k | base64 -d > /witfoo/witfoo_ca_2024.crt
+cp /witfoo/witfoo_ca_2024.crt /usr/local/share/ca-certificates/witfoo_ca_2024.crt
 update-ca-certificates
