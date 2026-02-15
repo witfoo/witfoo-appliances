@@ -79,3 +79,17 @@ sudo wfa configure
 ```
 
 This will guide you through selecting the role for this appliance.
+
+## Resources
+
+| Resource | Access | Notes |
+|----------|--------|-------|
+| [Documentation](https://docs.witfoo.com/) | Open | All WitFoo Product, API, MCP, and User Documentation |
+| [Discussions](https://github.com/witfoo/witfoo-appliances/discussions) | GitHub Account | Public conversations on WitFoo Products |
+| [Downloads](https://github.com/witfoo/witfoo-appliances) | Open | Download or Launch WitFoo Appliances |
+| [Demo](https://demo.witfoo.com) | Open | Live demo of WitFoo Analytics Platform |
+| [Open Ticket](https://witfoo.zendesk.com/hc/en-us/requests/new) | Open | Open a (private) ticket with the WitFoo team. Can be product or business related. |
+| [Training](https://witfoo.myabsorb.com/) | Free Registration (click Sign Up) | Official WitFoo training courses for users, engineers, and partners. Include WitFoo Certifications (upon passing exams.) |
+| [LinkedIn](https://www.linkedin.com/company/witfoo) | Open | Public Updates and Social Engagement |
+| [Videos](https://vimeo.com/witfoo) | Open | WitFoo Public videos (training and marketing) |
+| [WWW](https://www.witfoo.com) | Open | WitFoo official website |
