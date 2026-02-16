@@ -21,7 +21,7 @@
 # underlying disk before running this script.
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 # ---- Preflight checks -------------------------------------------------------
 
@@ -96,23 +96,73 @@ fi
 
 # ---- Identify the /data logical volume and its physical volume ---------------
 
-# Get LV path for /data
-DATA_LV=$(findmnt -n -o SOURCE /data 2>/dev/null || true)
-if [[ -z "$DATA_LV" ]]; then
-    echo "ERROR: Could not determine the logical volume for /data."
+# Get LV path for /data (e.g., /dev/mapper/rhel_witfoo--appliance-data)
+DATA_SOURCE=$(findmnt -n -o SOURCE /data 2>/dev/null || true)
+if [[ -z "$DATA_SOURCE" ]]; then
+    echo "ERROR: Could not determine the source device for /data."
     exit 1
 fi
+echo "Source device for /data: $DATA_SOURCE"
 
-# Resolve device-mapper path to LV name
-DATA_LV=$(readlink -f "$DATA_LV")
-echo "Logical volume for /data: $DATA_LV"
+# Use lvs to find the LV and VG by scanning all LVs and matching the dm path
+# findmnt may return /dev/mapper/... or /dev/dm-N — both need special handling
+DATA_LV=""
+DATA_VG=""
 
-# Get the volume group name
-DATA_VG=$(lvs --noheadings -o vg_name "$DATA_LV" 2>/dev/null | tr -d ' ')
+# First try: use lvs directly with the mapper path
+DATA_VG=$(lvs --noheadings -o vg_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
+DATA_LV_NAME=$(lvs --noheadings -o lv_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
+
+# Second try: resolve to dm path and match against lvs output
 if [[ -z "$DATA_VG" ]]; then
-    echo "ERROR: Could not determine the volume group for $DATA_LV."
+    DM_PATH=$(readlink -f "$DATA_SOURCE")
+    echo "Resolved dm path: $DM_PATH"
+    # Get all LVs and find the one matching our dm path
+    while IFS= read -r line; do
+        lv_vg=$(echo "$line" | awk '{print $1}')
+        lv_name=$(echo "$line" | awk '{print $2}')
+        lv_dm=$(echo "$line" | awk '{print $3}')
+        lv_dm_resolved=$(readlink -f "$lv_dm" 2>/dev/null || echo "$lv_dm")
+        if [[ "$lv_dm_resolved" == "$DM_PATH" ]] || [[ "$lv_dm" == "$DATA_SOURCE" ]]; then
+            DATA_VG="$lv_vg"
+            DATA_LV_NAME="$lv_name"
+            break
+        fi
+    done < <(lvs --noheadings -o vg_name,lv_name,lv_dm_path 2>/dev/null)
+fi
+
+# Third try: look for an LV named "data" in any VG
+if [[ -z "$DATA_VG" ]]; then
+    echo "Scanning for LV named 'data'..."
+    DATA_VG=$(lvs --noheadings -o vg_name -S "lv_name=data" 2>/dev/null | tr -d ' ' | head -1 || true)
+    DATA_LV_NAME="data"
+fi
+
+if [[ -z "$DATA_VG" || -z "$DATA_LV_NAME" ]]; then
+    echo "ERROR: Could not determine the volume group for /data."
+    echo "       Source device: $DATA_SOURCE"
+    echo ""
+    echo "LVM status:"
+    lvs 2>/dev/null || true
     exit 1
 fi
+
+# Build the full LV path
+DATA_LV="/dev/${DATA_VG}/${DATA_LV_NAME}"
+echo "Logical volume: $DATA_LV (VG: $DATA_VG, LV: $DATA_LV_NAME)"
+
+# Verify the LV exists
+if ! lvs "$DATA_LV" &>/dev/null; then
+    # Try the mapper path format: /dev/mapper/VG-LV (with dashes doubled in VG name)
+    MAPPER_VG=$(echo "$DATA_VG" | sed 's/-/--/g')
+    DATA_LV="/dev/mapper/${MAPPER_VG}-${DATA_LV_NAME}"
+    echo "Using mapper path: $DATA_LV"
+    if ! lvs "$DATA_LV" &>/dev/null; then
+        echo "ERROR: Logical volume $DATA_LV does not exist."
+        exit 1
+    fi
+fi
+
 echo "Volume group: $DATA_VG"
 
 # Get the physical volume(s) in this VG
@@ -151,6 +201,11 @@ fi
 
 echo "Disk: $DISK"
 echo "Partition number: $PART_NUM"
+echo ""
+
+# Show current disk layout
+echo "Current disk layout:"
+lsblk "$DISK" -o NAME,SIZE,TYPE,MOUNTPOINT 2>/dev/null || lsblk "$DISK" -o NAME,SIZE,TYPE 2>/dev/null || true
 echo ""
 
 # ---- Capture current state ---------------------------------------------------
@@ -201,7 +256,8 @@ echo ""
 
 # ---- Grow the partition ------------------------------------------------------
 
-echo "Growing partition ${DISK}${PART_NUM} to fill available disk space..."
+echo "Growing partition $PART_NUM on ${DISK} to fill available disk space..."
+echo "Running: growpart $DISK $PART_NUM"
 
 # growpart exits 0 on success, 1 on "no change needed" (NOCHANGE)
 GROW_EXIT=0
@@ -235,7 +291,10 @@ sleep 1
 
 echo ""
 echo "Resizing physical volume $DATA_PV..."
-pvresize "$DATA_PV"
+if ! pvresize "$DATA_PV"; then
+    echo "ERROR: pvresize failed on $DATA_PV."
+    exit 1
+fi
 
 # ---- Extend the logical volume -----------------------------------------------
 
@@ -243,9 +302,13 @@ echo ""
 echo "Extending logical volume $DATA_LV to use all free space..."
 
 FREE_EXTENTS=$(vgs --noheadings --nosuffix -o vg_free_count "$DATA_VG" 2>/dev/null | tr -d ' ')
+echo "Free extents in VG $DATA_VG: $FREE_EXTENTS"
 
 if [[ "$FREE_EXTENTS" -gt 0 ]]; then
-    lvextend -l +100%FREE "$DATA_LV"
+    if ! lvextend -l +100%FREE "$DATA_LV"; then
+        echo "ERROR: lvextend failed on $DATA_LV."
+        exit 1
+    fi
     echo "Logical volume extended."
 else
     echo "No free extents available in volume group $DATA_VG."
