@@ -11,11 +11,10 @@
 #   2. SSH into the appliance and run: sudo ./expand-disk.sh
 #
 # This script will:
-#   - Detect the physical volume (PV) used by the /data logical volume
+#   - Detect whether /data uses LVM or a plain partition
 #   - Grow the partition to fill the expanded disk
-#   - Resize the physical volume to use the new space
-#   - Extend the /data logical volume to use all free extents
-#   - Resize the filesystem online
+#   - For LVM: resize the PV, extend the LV, resize the filesystem
+#   - For plain partitions: resize the filesystem directly
 #
 # See EXPAND_DISK.md for platform-specific instructions on expanding the
 # underlying disk before running this script.
@@ -42,11 +41,10 @@ if ! mountpoint -q /data; then
     exit 1
 fi
 
-# Verify LVM tools are available
-for cmd in pvs vgs lvs pvresize lvextend lsblk; do
+# Verify core tools are available
+for cmd in lsblk findmnt; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "ERROR: Required command '$cmd' not found."
-        echo "       Install LVM tools: apt install lvm2 (Ubuntu) or dnf install lvm2 (RHEL)"
         exit 1
     fi
 done
@@ -94,9 +92,8 @@ if ! command -v growpart &>/dev/null; then
     exit 1
 fi
 
-# ---- Identify the /data logical volume and its physical volume ---------------
+# ---- Identify the /data device and determine LVM vs plain partition ----------
 
-# Get LV path for /data (e.g., /dev/mapper/rhel_witfoo--appliance-data)
 DATA_SOURCE=$(findmnt -n -o SOURCE /data 2>/dev/null || true)
 if [[ -z "$DATA_SOURCE" ]]; then
     echo "ERROR: Could not determine the source device for /data."
@@ -104,97 +101,92 @@ if [[ -z "$DATA_SOURCE" ]]; then
 fi
 echo "Source device for /data: $DATA_SOURCE"
 
-# Use lvs to find the LV and VG by scanning all LVs and matching the dm path
-# findmnt may return /dev/mapper/... or /dev/dm-N — both need special handling
+# Determine if /data is on LVM or a plain partition
+USE_LVM=false
 DATA_LV=""
 DATA_VG=""
+DATA_PV=""
 
-# First try: use lvs directly with the mapper path
-DATA_VG=$(lvs --noheadings -o vg_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
-DATA_LV_NAME=$(lvs --noheadings -o lv_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
+if command -v lvs &>/dev/null; then
+    # First try: use lvs directly with the source path
+    DATA_VG=$(lvs --noheadings -o vg_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
+    DATA_LV_NAME=$(lvs --noheadings -o lv_name "$DATA_SOURCE" 2>/dev/null | tr -d ' ' || true)
 
-# Second try: resolve to dm path and match against lvs output
-if [[ -z "$DATA_VG" ]]; then
-    DM_PATH=$(readlink -f "$DATA_SOURCE")
-    echo "Resolved dm path: $DM_PATH"
-    # Get all LVs and find the one matching our dm path
-    while IFS= read -r line; do
-        lv_vg=$(echo "$line" | awk '{print $1}')
-        lv_name=$(echo "$line" | awk '{print $2}')
-        lv_dm=$(echo "$line" | awk '{print $3}')
-        lv_dm_resolved=$(readlink -f "$lv_dm" 2>/dev/null || echo "$lv_dm")
-        if [[ "$lv_dm_resolved" == "$DM_PATH" ]] || [[ "$lv_dm" == "$DATA_SOURCE" ]]; then
-            DATA_VG="$lv_vg"
-            DATA_LV_NAME="$lv_name"
-            break
+    # Second try: resolve to dm path and match against lvs output
+    if [[ -z "$DATA_VG" ]]; then
+        DM_PATH=$(readlink -f "$DATA_SOURCE")
+        while IFS= read -r line; do
+            lv_vg=$(echo "$line" | awk '{print $1}')
+            lv_name=$(echo "$line" | awk '{print $2}')
+            lv_dm=$(echo "$line" | awk '{print $3}')
+            lv_dm_resolved=$(readlink -f "$lv_dm" 2>/dev/null || echo "$lv_dm")
+            if [[ "$lv_dm_resolved" == "$DM_PATH" ]] || [[ "$lv_dm" == "$DATA_SOURCE" ]]; then
+                DATA_VG="$lv_vg"
+                DATA_LV_NAME="$lv_name"
+                break
+            fi
+        done < <(lvs --noheadings -o vg_name,lv_name,lv_dm_path 2>/dev/null)
+    fi
+
+    # Third try: look for an LV named "data" in any VG
+    if [[ -z "$DATA_VG" ]]; then
+        DATA_VG=$(lvs --noheadings -o vg_name -S "lv_name=data" 2>/dev/null | tr -d ' ' | head -1 || true)
+        if [[ -n "$DATA_VG" ]]; then
+            DATA_LV_NAME="data"
         fi
-    done < <(lvs --noheadings -o vg_name,lv_name,lv_dm_path 2>/dev/null)
-fi
+    fi
 
-# Third try: look for an LV named "data" in any VG
-if [[ -z "$DATA_VG" ]]; then
-    echo "Scanning for LV named 'data'..."
-    DATA_VG=$(lvs --noheadings -o vg_name -S "lv_name=data" 2>/dev/null | tr -d ' ' | head -1 || true)
-    DATA_LV_NAME="data"
-fi
+    if [[ -n "$DATA_VG" && -n "$DATA_LV_NAME" ]]; then
+        USE_LVM=true
+        DATA_LV="/dev/${DATA_VG}/${DATA_LV_NAME}"
 
-if [[ -z "$DATA_VG" || -z "$DATA_LV_NAME" ]]; then
-    echo "ERROR: Could not determine the volume group for /data."
-    echo "       Source device: $DATA_SOURCE"
-    echo ""
-    echo "LVM status:"
-    lvs 2>/dev/null || true
-    exit 1
-fi
+        # Verify the LV exists, try mapper path if needed
+        if ! lvs "$DATA_LV" &>/dev/null; then
+            MAPPER_VG=$(echo "$DATA_VG" | sed 's/-/--/g')
+            DATA_LV="/dev/mapper/${MAPPER_VG}-${DATA_LV_NAME}"
+        fi
 
-# Build the full LV path
-DATA_LV="/dev/${DATA_VG}/${DATA_LV_NAME}"
-echo "Logical volume: $DATA_LV (VG: $DATA_VG, LV: $DATA_LV_NAME)"
+        # Get the physical volume
+        DATA_PV=$(pvs --noheadings -o pv_name -S "vg_name=$DATA_VG" 2>/dev/null | tr -d ' ' | head -1)
 
-# Verify the LV exists
-if ! lvs "$DATA_LV" &>/dev/null; then
-    # Try the mapper path format: /dev/mapper/VG-LV (with dashes doubled in VG name)
-    MAPPER_VG=$(echo "$DATA_VG" | sed 's/-/--/g')
-    DATA_LV="/dev/mapper/${MAPPER_VG}-${DATA_LV_NAME}"
-    echo "Using mapper path: $DATA_LV"
-    if ! lvs "$DATA_LV" &>/dev/null; then
-        echo "ERROR: Logical volume $DATA_LV does not exist."
-        exit 1
+        echo "Layout: LVM"
+        echo "Logical volume: $DATA_LV (VG: $DATA_VG, LV: $DATA_LV_NAME)"
+        echo "Physical volume: $DATA_PV"
     fi
 fi
 
-echo "Volume group: $DATA_VG"
-
-# Get the physical volume(s) in this VG
-DATA_PV=$(pvs --noheadings -o pv_name -S "vg_name=$DATA_VG" 2>/dev/null | tr -d ' ' | head -1)
-if [[ -z "$DATA_PV" ]]; then
-    echo "ERROR: Could not determine the physical volume for VG $DATA_VG."
-    exit 1
+if [[ "$USE_LVM" == false ]]; then
+    echo "Layout: Plain partition (no LVM)"
 fi
-echo "Physical volume: $DATA_PV"
 
 # ---- Identify the disk and partition number ----------------------------------
 
-# Resolve symlinks (e.g., /dev/mapper/... → /dev/sdaX)
-PV_RESOLVED=$(readlink -f "$DATA_PV")
+# For LVM, parse from the PV; for plain partition, parse from the source device
+if [[ "$USE_LVM" == true ]]; then
+    PART_DEVICE=$(readlink -f "$DATA_PV")
+else
+    PART_DEVICE=$(readlink -f "$DATA_SOURCE")
+fi
+
+echo "Partition device: $PART_DEVICE"
 
 # Extract the base disk and partition number
-# Handles: /dev/sda3, /dev/nvme0n1p3, /dev/vda3, /dev/xvda3
-if [[ "$PV_RESOLVED" =~ ^(/dev/[a-z]+)([0-9]+)$ ]]; then
+# Handles: /dev/sda3, /dev/nvme0n1p3, /dev/vda3, /dev/xvda3, /dev/mmcblk0p3
+if [[ "$PART_DEVICE" =~ ^(/dev/nvme[0-9]+n[0-9]+)p([0-9]+)$ ]]; then
     DISK="${BASH_REMATCH[1]}"
     PART_NUM="${BASH_REMATCH[2]}"
-elif [[ "$PV_RESOLVED" =~ ^(/dev/nvme[0-9]+n[0-9]+)p([0-9]+)$ ]]; then
+elif [[ "$PART_DEVICE" =~ ^(/dev/xvd[a-z]+)([0-9]+)$ ]]; then
     DISK="${BASH_REMATCH[1]}"
     PART_NUM="${BASH_REMATCH[2]}"
-elif [[ "$PV_RESOLVED" =~ ^(/dev/xvd[a-z]+)([0-9]+)$ ]]; then
+elif [[ "$PART_DEVICE" =~ ^(/dev/[a-z]+[0-9]+)p([0-9]+)$ ]]; then
+    # Devices like /dev/mmcblk0p3
     DISK="${BASH_REMATCH[1]}"
     PART_NUM="${BASH_REMATCH[2]}"
-elif [[ "$PV_RESOLVED" =~ ^(/dev/[a-z]+[0-9]+)p([0-9]+)$ ]]; then
-    # Fallback for other partitioned devices like /dev/mmcblk0p3
+elif [[ "$PART_DEVICE" =~ ^(/dev/[a-z]+)([0-9]+)$ ]]; then
     DISK="${BASH_REMATCH[1]}"
     PART_NUM="${BASH_REMATCH[2]}"
 else
-    echo "ERROR: Could not parse disk and partition from '$PV_RESOLVED'."
+    echo "ERROR: Could not parse disk and partition from '$PART_DEVICE'."
     echo "       Expected format like /dev/sda3, /dev/nvme0n1p3, or /dev/vda3."
     exit 1
 fi
@@ -210,14 +202,15 @@ echo ""
 
 # ---- Capture current state ---------------------------------------------------
 
-BEFORE_PV_SIZE=$(pvs --noheadings --nosuffix --units g -o pv_size "$DATA_PV" 2>/dev/null | tr -d ' ')
-BEFORE_LV_SIZE=$(lvs --noheadings --nosuffix --units g -o lv_size "$DATA_LV" 2>/dev/null | tr -d ' ')
 BEFORE_FS_SIZE=$(df -BG /data | tail -1 | awk '{print $2}')
+echo "Current /data filesystem size: ${BEFORE_FS_SIZE}"
 
-echo "Current sizes:"
-echo "  Physical volume:  ${BEFORE_PV_SIZE}G"
-echo "  Logical volume:   ${BEFORE_LV_SIZE}G"
-echo "  Filesystem:       ${BEFORE_FS_SIZE}"
+if [[ "$USE_LVM" == true ]]; then
+    BEFORE_PV_SIZE=$(pvs --noheadings --nosuffix --units g -o pv_size "$DATA_PV" 2>/dev/null | tr -d ' ')
+    BEFORE_LV_SIZE=$(lvs --noheadings --nosuffix --units g -o lv_size "$DATA_LV" 2>/dev/null | tr -d ' ')
+    echo "Physical volume:  ${BEFORE_PV_SIZE}G"
+    echo "Logical volume:   ${BEFORE_LV_SIZE}G"
+fi
 echo ""
 
 # ---- Rescan disks (for hypervisors/cloud that need it) -----------------------
@@ -287,65 +280,80 @@ if command -v partprobe &>/dev/null; then
 fi
 sleep 1
 
-# ---- Resize the physical volume ---------------------------------------------
+# ---- Resize storage layer (LVM or direct) ------------------------------------
 
-echo ""
-echo "Resizing physical volume $DATA_PV..."
-if ! pvresize "$DATA_PV"; then
-    echo "ERROR: pvresize failed on $DATA_PV."
-    exit 1
-fi
-
-# ---- Extend the logical volume -----------------------------------------------
-
-echo ""
-echo "Extending logical volume $DATA_LV to use all free space..."
-
-FREE_EXTENTS=$(vgs --noheadings --nosuffix -o vg_free_count "$DATA_VG" 2>/dev/null | tr -d ' ')
-echo "Free extents in VG $DATA_VG: $FREE_EXTENTS"
-
-if [[ "$FREE_EXTENTS" -gt 0 ]]; then
-    if ! lvextend -l +100%FREE "$DATA_LV"; then
-        echo "ERROR: lvextend failed on $DATA_LV."
-        exit 1
-    fi
-    echo "Logical volume extended."
-else
-    echo "No free extents available in volume group $DATA_VG."
-    echo "The logical volume is already using all available space."
-fi
-
-# ---- Resize the filesystem ---------------------------------------------------
-
-echo ""
-echo "Resizing filesystem on /data..."
-
-# Detect filesystem type
+# Detect filesystem type (used for both LVM and plain partition paths)
 FS_TYPE=$(findmnt -n -o FSTYPE /data 2>/dev/null || true)
+echo ""
 echo "Filesystem type: ${FS_TYPE:-unknown}"
 
-case "$FS_TYPE" in
-    ext4|ext3|ext2)
-        resize2fs "$DATA_LV"
-        ;;
-    xfs)
-        xfs_growfs /data
-        ;;
-    "")
-        echo "WARNING: Could not detect filesystem type. Trying both resize methods..."
-        resize2fs "$DATA_LV" 2>/dev/null || xfs_growfs /data 2>/dev/null || {
-            echo "ERROR: Failed to resize filesystem."
+# Function to resize the filesystem
+resize_filesystem() {
+    local device="$1"
+    echo ""
+    echo "Resizing filesystem on /data..."
+    case "$FS_TYPE" in
+        ext4|ext3|ext2)
+            if ! resize2fs "$device"; then
+                echo "ERROR: resize2fs failed on $device."
+                exit 1
+            fi
+            ;;
+        xfs)
+            if ! xfs_growfs /data; then
+                echo "ERROR: xfs_growfs failed on /data."
+                exit 1
+            fi
+            ;;
+        "")
+            echo "WARNING: Could not detect filesystem type. Trying both resize methods..."
+            resize2fs "$device" 2>/dev/null || xfs_growfs /data 2>/dev/null || {
+                echo "ERROR: Failed to resize filesystem."
+                exit 1
+            }
+            ;;
+        *)
+            echo "ERROR: Unsupported filesystem type '$FS_TYPE'."
+            echo "       Only ext4 and xfs are supported."
             exit 1
-        }
-        ;;
-    *)
-        echo "ERROR: Unsupported filesystem type '$FS_TYPE'."
-        echo "       Only ext4 and xfs are supported."
-        exit 1
-        ;;
-esac
+            ;;
+    esac
+    echo "Filesystem resized."
+}
 
-echo "Filesystem resized."
+if [[ "$USE_LVM" == true ]]; then
+    # ---- LVM path: pvresize → lvextend → resize fs --------------------------
+
+    echo ""
+    echo "Resizing physical volume $DATA_PV..."
+    if ! pvresize "$DATA_PV"; then
+        echo "ERROR: pvresize failed on $DATA_PV."
+        exit 1
+    fi
+
+    echo ""
+    echo "Extending logical volume $DATA_LV to use all free space..."
+    FREE_EXTENTS=$(vgs --noheadings --nosuffix -o vg_free_count "$DATA_VG" 2>/dev/null | tr -d ' ')
+    echo "Free extents in VG $DATA_VG: $FREE_EXTENTS"
+
+    if [[ "$FREE_EXTENTS" -gt 0 ]]; then
+        if ! lvextend -l +100%FREE "$DATA_LV"; then
+            echo "ERROR: lvextend failed on $DATA_LV."
+            exit 1
+        fi
+        echo "Logical volume extended."
+    else
+        echo "No free extents available in volume group $DATA_VG."
+        echo "The logical volume is already using all available space."
+    fi
+
+    resize_filesystem "$DATA_LV"
+
+else
+    # ---- Plain partition path: resize fs directly ----------------------------
+
+    resize_filesystem "$PART_DEVICE"
+fi
 
 # ---- Report results ----------------------------------------------------------
 
@@ -353,14 +361,16 @@ echo ""
 echo "=========================================="
 echo " Expansion Complete"
 echo "=========================================="
-
-AFTER_PV_SIZE=$(pvs --noheadings --nosuffix --units g -o pv_size "$DATA_PV" 2>/dev/null | tr -d ' ')
-AFTER_LV_SIZE=$(lvs --noheadings --nosuffix --units g -o lv_size "$DATA_LV" 2>/dev/null | tr -d ' ')
-
 echo ""
-echo "Physical volume:  ${BEFORE_PV_SIZE}G → ${AFTER_PV_SIZE}G"
-echo "Logical volume:   ${BEFORE_LV_SIZE}G → ${AFTER_LV_SIZE}G"
-echo ""
+
+if [[ "$USE_LVM" == true ]]; then
+    AFTER_PV_SIZE=$(pvs --noheadings --nosuffix --units g -o pv_size "$DATA_PV" 2>/dev/null | tr -d ' ')
+    AFTER_LV_SIZE=$(lvs --noheadings --nosuffix --units g -o lv_size "$DATA_LV" 2>/dev/null | tr -d ' ')
+    echo "Physical volume:  ${BEFORE_PV_SIZE}G → ${AFTER_PV_SIZE}G"
+    echo "Logical volume:   ${BEFORE_LV_SIZE}G → ${AFTER_LV_SIZE}G"
+    echo ""
+fi
+
 df -h /data
 echo ""
 
