@@ -13,8 +13,8 @@ Support is available at [Submit a request](https://witfoo.zendesk.com/hc/en-us/r
 | Platform | Ubuntu24 |  RHEL10  |
 |----------|----------|----------|
 | <img src="logos/vmware.png" alt="VMware" width="200"> | COMING | COMING |
-| <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [US](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) [AU](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) | COMING |
-| <img src="logos/qemu.png" alt="QEMU" width="200"> | [US](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) [AU](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) | COMING |
+| <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [🇺🇸 ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) [🇦🇺 ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) | COMING |
+| <img src="logos/qemu.png" alt="QEMU" width="200"> | [🇺🇸 ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) [🇦🇺 ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) | COMING |
 
 ## Cloud Marketplace Installs
 
