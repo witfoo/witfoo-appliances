@@ -12,9 +12,9 @@ Support is available at [Submit a request](https://witfoo.zendesk.com/hc/en-us/r
 
 | Platform | Download |
 |----------|----------|
-| <img src="logos/vmware.png" alt="VMware" width="200"> | [WitFoo Appliance Ubuntu 24 for VMware](https://github.com/witfoo/witfoo-appliances/releases/latest) |
-| <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [WitFoo Appliance Ubuntu 24 for Hyper-V](https://github.com/witfoo/witfoo-appliances/releases/latest) |
-| <img src="logos/qemu.png" alt="QEMU" width="200"> | [WitFoo Appliance Ubuntu 24 for QEMU](https://github.com/witfoo/witfoo-appliances/releases/latest) |
+| <img src="logos/vmware.png" alt="VMware" width="200"> | [WitFoo Appliance Ubuntu 24 for VMware](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-vmware-ubuntu24.ova) |
+| <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [WitFoo Appliance Ubuntu 24 for Hyper-V](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) |
+| <img src="logos/qemu.png" alt="QEMU" width="200"> | [WitFoo Appliance Ubuntu 24 for QEMU](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) |
 
 ## Cloud Marketplace Installs
 
