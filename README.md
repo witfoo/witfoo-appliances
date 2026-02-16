@@ -112,7 +112,7 @@ Cloud marketplace appliances do not use a default password. You must provide an 
 
 ## Expanding Disk
 
-As data is ingested and retained, disk usage will grow — particularly on **Analytics AIO** and **Data Node** roles. It is critical to scale data clusters vertically (expanding disk on existing nodes) or horizontally (adding more Data Nodes). The `/data` partition must remain at least **50% free** to allow database compaction and cleanup to run properly.
+As data is ingested and retained, disk usage will grow — particularly on **Analytics AIO** and **Data Node** roles. Plan for **1TB to 8TB of total disk space per Data Node or AIO node** depending on ingestion volume and retention requirements. It is critical to scale data clusters vertically (expanding disk on existing nodes) or horizontally (adding more Data Nodes). The `/data` partition must remain at least **50% free** to allow database compaction and cleanup to run properly.
 
 See [EXPAND_DISK.md](EXPAND_DISK.md) for step-by-step instructions on expanding disk across all supported hypervisors and cloud platforms.
 

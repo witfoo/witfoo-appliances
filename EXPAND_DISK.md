@@ -6,7 +6,7 @@ Disk expansion is a critical operational task for WitFoo appliances, especially 
 
 ## Why Disk Expansion Matters
 
-- **Data Retention** — AIO and Data Node appliances store ingested log data on the `/data` partition. The volume of retained data is directly tied to your retention policy and ingestion rate. Higher retention periods or throughput require more disk.
+- **Data Retention** — AIO and Data Node appliances store ingested log data on the `/data` partition. The volume of retained data is directly tied to your retention policy and ingestion rate. Higher retention periods or throughput require more disk. Plan for **1TB to 8TB of total disk space per Data Node or AIO node** depending on ingestion volume and retention requirements.
 - **Database Health** — Cassandra requires free disk space to perform compaction (merging and cleaning up SSTables). Without adequate headroom, compaction stalls and the database becomes unresponsive.
 - **Vertical vs. Horizontal Scaling** — It is critical to scale data clusters either vertically (expanding disk on existing nodes) or horizontally (adding more Data Nodes to the cluster). Failure to scale in either direction will result in storage exhaustion and service interruption. Plan capacity proactively — do not wait for alerts.
 
