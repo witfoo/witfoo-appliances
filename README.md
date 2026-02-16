@@ -75,6 +75,13 @@ Generation 2 VMs use UEFI firmware and support Secure Boot. For more information
 | Ubuntu 24 | [ubuntu-install.sh](ubuntu-install.sh) |
 | RHEL 10 | [rhel-install.sh](rhel-install.sh) |
 
+## Appliance Scripts
+
+| Script | Description |
+| --- | --- |
+| [setup.sh](setup.sh) | Initial appliance configuration wizard — assigns the appliance role |
+| [expand-disk.sh](expand-disk.sh) | Expands the `/data` LVM partition after adding disk at the hypervisor/cloud layer |
+
 > **Important:** When installing on bare metal, ensure the [Disk Partition Layout](#disk-partition-layout) is followed before running the install script. The isolated partitions are critical for stable performance and preventing resource contention between services.
 
 ---
