@@ -3,10 +3,11 @@
 WitFoo software is deployed to a **WitFoo Appliance**. Follow these three steps to get up and running:
 
 1. **Deploy the Appliance** — Select a deployment target below (hypervisor, cloud marketplace, or bare metal) and launch the instance.
-2. **SSH in and run setup** — Connect to the appliance via SSH and run `sudo ./setup.sh` to configure the appliance role. For details on the configuration wizard, see [WFA Configure Documentation](https://docs.witfoo.com/getting-started/wfa-configure/). If setup.sh is not present, run the appropriate commands for your OS:
+2. **Expand Disk as Needed** — If your workload requires additional storage, [expand the disk](EXPAND_DISK.md) before or after setup. This is critical for AIO and Data Node roles — the `/data` partition must stay at least 50% free for database health.
+3. **SSH in and run setup** — Connect to the appliance via SSH and run `sudo ./setup.sh` to configure the appliance role. For details on the configuration wizard, see [WFA Configure Documentation](https://docs.witfoo.com/getting-started/wfa-configure/). If setup.sh is not present, run the appropriate commands for your OS:
    - **Ubuntu**: `sudo apt update && sudo apt upgrade -y && sudo wfa configure`
    - **RHEL**: `sudo dnf update -y && sudo wfa configure`
-3. **Connect to the Interface** — Open a browser, navigate to the appliance IP, and complete the setup wizard. See [First Login Documentation](https://docs.witfoo.com/getting-started/first-login/).
+4. **Connect to the Interface** — Open a browser, navigate to the appliance IP, and complete the setup wizard. See [First Login Documentation](https://docs.witfoo.com/getting-started/first-login/).
 
 For full documentation on configuration and use, visit [docs.witfoo.com](https://docs.witfoo.com/).
 
@@ -108,6 +109,12 @@ Change these immediately after first login.
 - **Authentication**: SSH key (required at launch)
 
 Cloud marketplace appliances do not use a default password. You must provide an SSH key when launching the instance.
+
+## Expanding Disk
+
+As data is ingested and retained, disk usage will grow — particularly on **Analytics AIO** and **Data Node** roles. It is critical to scale data clusters vertically (expanding disk on existing nodes) or horizontally (adding more Data Nodes). The `/data` partition must remain at least **50% free** to allow database compaction and cleanup to run properly.
+
+See [EXPAND_DISK.md](EXPAND_DISK.md) for step-by-step instructions on expanding disk across all supported hypervisors and cloud platforms.
 
 ## Disk Partition Layout
 
