@@ -116,6 +116,12 @@ As data is ingested and retained, disk usage will grow — particularly on **Ana
 
 See [EXPAND_DISK.md](EXPAND_DISK.md) for step-by-step instructions on expanding disk across all supported hypervisors and cloud platforms.
 
+## Scaling the Data Cluster
+
+For production deployments, horizontal scaling by adding Data Nodes to the cluster is strongly recommended. Multiple nodes provide fault tolerance, distribute read/write load, and increase total retention capacity. With a replication factor of 3, the cluster can tolerate node failures without data loss or downtime. The default single-node configuration is suitable for evaluation, non-critical, or smaller workloads.
+
+See [DATA_CLUSTER.md](DATA_CLUSTER.md) for replication strategy commands, recommended cluster sizes, and step-by-step instructions for adding nodes.
+
 ## Disk Partition Layout
 
 All appliance images use LVM with the following partition layout. These partitions are critical for stable performance — isolating Docker storage, logs, audit trails, and application data prevents any single volume from starving the others. If building on bare metal, do not skip meeting these minimums.
