@@ -1,10 +1,18 @@
 # Install WitFoo Software
 
-WitFoo software is available for trial in multiple configurations. WitFoo software is always deployed to a **WitFoo Appliance**. Running `sudo wfa configure` will select the function the specific appliance will execute.
+WitFoo software is deployed to a **WitFoo Appliance**. Follow these three steps to get up and running:
 
-Self-paced, no-cost training and certification is available here: [https://witfoo.myabsorb.com/](https://witfoo.myabsorb.com/)
+1. **Deploy the Appliance** — Select a deployment target below (hypervisor, cloud marketplace, or bare metal) and launch the instance.
+2. **SSH in and run setup** — Connect to the appliance via SSH and run `sudo ./setup.sh` to configure the appliance role. For details on the configuration wizard, see [WFA Configure Documentation](https://docs.witfoo.com/getting-started/wfa-configure/). If setup.sh is not present, run the appropriate commands for your OS:
+   - **Ubuntu**: `sudo apt update && sudo apt upgrade -y && sudo wfa configure`
+   - **RHEL**: `sudo dnf update -y && sudo wfa configure`
+3. **Connect to the Interface** — Open a browser, navigate to the appliance IP, and complete the setup wizard. See [First Login Documentation](https://docs.witfoo.com/getting-started/first-login/).
 
-Support is available at [Submit a request](https://witfoo.zendesk.com/hc/en-us/requests/new)
+For full documentation on configuration and use, visit [docs.witfoo.com](https://docs.witfoo.com/).
+
+> **Note:** If you do not have a license key, a 15-day trial license can be automatically generated during setup.
+
+Have questions? [Submit a Ticket](https://witfoo.zendesk.com/hc/en-us/requests/new). Free self-paced training and certification is available at [witfoo.myabsorb.com](https://witfoo.myabsorb.com/).
 
 ---
 
@@ -15,6 +23,8 @@ Support is available at [Submit a request](https://witfoo.zendesk.com/hc/en-us/r
 | <img src="logos/vmware.png" alt="VMware" width="200"> | [<img src="logos/us.svg" alt="US" width="30"> ⬇️](https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-vmware-ubuntu24.zip) [<img src="logos/au.svg" alt="AU" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-vmware-ubuntu24.zip) | [<img src="logos/us.svg" alt="US" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-vmware-rhel10.zip) [<img src="logos/au.svg" alt="AU" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-vmware-rhel10.zip) |
 | <img src="logos/hyper-v.png" alt="Hyper-V" width="200"> | [<img src="logos/us.svg" alt="US" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) [<img src="logos/au.svg" alt="AU" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-ubuntu24.zip) | [<img src="logos/us.svg" alt="US" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-rhel10.zip) [<img src="logos/au.svg" alt="AU" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-hyperv-rhel10.zip) |
 | <img src="logos/qemu.png" alt="QEMU" width="200"> | [<img src="logos/us.svg" alt="US" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.us-chicago-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) [<img src="logos/au.svg" alt="AU" width="30"> ⬇️](https://ax4xtzq35yny.objectstorage.ap-melbourne-1.oci.customer-oci.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo-appliance-qemu-ubuntu24.zip) | --- |
+
+> The <img src="logos/us.svg" alt="US" width="20"> US and <img src="logos/au.svg" alt="AU" width="20"> Australia download links are identical images hosted on separate mirrors. Choose the region closest to you for the fastest download.
 
 ## Hypervisor Instructions
 
@@ -64,27 +74,44 @@ Generation 2 VMs use UEFI firmware and support Secure Boot. For more information
 | Ubuntu 24 | [ubuntu-install.sh](ubuntu-install.sh) |
 | RHEL 10 | [rhel-install.sh](rhel-install.sh) |
 
+> **Important:** When installing on bare metal, ensure the [Disk Partition Layout](#disk-partition-layout) is followed before running the install script. The isolated partitions are critical for stable performance and preventing resource contention between services.
+
 ---
 
 ## WitFoo Appliance Roles
 
-| WitFoo Role | CPU Cores (minimum) | RAM (minimum) |
-| --- | --- | --- |
-| Conductor | 4 CPU | 8GB |
-| Console | 4 CPU | 8GB |
+| WitFoo Role | CPU Cores (minimum) | CPU Cores (recommended) | RAM (minimum) | RAM (recommended) |
+| --- | --- | --- | --- | --- |
+| Conductor | 4 CPU | 6 CPU | 8GB | 12GB |
+| Console | 4 CPU | 6 CPU | 8GB | 12GB |
+| Analytics AIO with Conductor | 12 CPU | 18 CPU | 16GB | 24GB |
+| Analytics AIO no Conductor | 8 CPU | 12 CPU | 12GB | 18GB |
+| Analytics Node | 6 CPU | 9 CPU | 8GB | 12GB |
+| Data Node | 4 CPU | 6 CPU | 8GB | 12GB |
+
+> **Note:** CPU performance varies significantly across processor architectures. Not all cores are equal — newer processors can handle higher throughput with fewer cores. See [Benchmarks](BENCHMARKS.md) for tested configurations and throughput ratings.
 
 ---
 
 ## Default Credentials
+
+### On-Prem / Hypervisor
 
 - **Username**: `witfooadmin`
 - **Password**: `F00theN0ise!`
 
 Change these immediately after first login.
 
+### Cloud Marketplace
+
+- **Username**: `ubuntu`
+- **Authentication**: SSH key (required at launch)
+
+Cloud marketplace appliances do not use a default password. You must provide an SSH key when launching the instance.
+
 ## Disk Partition Layout
 
-All appliance images use LVM with the following partition layout:
+All appliance images use LVM with the following partition layout. These partitions are critical for stable performance — isolating Docker storage, logs, audit trails, and application data prevents any single volume from starving the others. If building on bare metal, do not skip meeting these minimums.
 
 | Mount Point | Size | Purpose |
 | --- | --- | --- |
@@ -98,17 +125,11 @@ All appliance images use LVM with the following partition layout:
 
 **Total disk size**: ~280GB
 
-## Configuration
+## Benchmarks
 
-After deploying the appliance, run:
+Different CPU architectures and core counts enable different workloads. Selecting the right processor family and vCPU allocation directly impacts the message throughput a WitFoo appliance can sustain. Newer architectures such as AMD EPYC 9R45 and Intel Xeon Granite Rapids deliver significantly higher per-core performance, allowing smaller instances to handle heavier ingestion rates.
 
-```bash
-sudo ./setup.sh
-```
-
-This will guide you through selecting the role for this appliance. (If setup.sh is not present, run `sudo apt update ; sudo apt upgrade -y ; sudo wfa configure`)
-
-For detailed installation instructions, see [The WitFoo "Getting Started" Documentation](https://docs.witfoo.com/getting-started/)
+See [BENCHMARKS.md](BENCHMARKS.md) for detailed hardware requirements and tested processor configurations at various throughput levels.
 
 ## Resources
 
