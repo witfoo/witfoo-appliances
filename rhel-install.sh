@@ -52,7 +52,7 @@ yum install -y linux-cloud-tools-$(uname -r)
 # WitFoo Appliance Manager
 echo "Installing WitFoo Appliance Manager"
 dnf config-manager --add-repo https://witfoo-dev.github.io/rpm/witfoo.repo
-dnf install -y wfa wfa-helper
+dnf install -y wfa
 
 # Update CA Trust with WitFoo CA
 echo "Updating CA Trust with WitFoo CA"
