@@ -4,13 +4,13 @@
 
 | WitFoo Appliance | CPU Cores (minimum) | RAM (minimum) |
 | --- | :---: | :---: |
-| Conductor | 4 CPU | 8GB |
-| Reporter | 8 CPU | 32GB |
-| Console | 4 CPU | 8GB |
-| Precinct All-In-One | 8 CPU | 32GB |
-| Precinct Data Node | 4 CPU | 12GB |
-| Precinct Streamer Node | 4 CPU | 12GB |
-| Precinct Mgmt Node | 4 CPU | 8GB |
+| Conductor | 2 CPU | 8GB |
+| Reporter | 2 CPU | 16GB |
+| Console | 1 CPU | 4GB |
+| Analytics All-In-One with Conductor | 6 CPU | 24GB |
+| Analytics All-In-One | 4 CPU | 16GB |
+| Analytics Data Node | 2 CPU | 8GB |
+| Analytics Node | 2 CPU | 6GB |
 
 ---
 
