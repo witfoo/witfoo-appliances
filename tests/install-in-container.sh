@@ -8,8 +8,9 @@
 #
 # The container has no systemd as PID 1, so systemctl is replaced by a stub that succeeds. That
 # makes this a test of the package, repository and file steps, not of services starting: it
-# proves the script installs WFA and Docker from the live repositories, survives a second run,
-# keeps existing Docker data, and refuses to run without root. AlmaLinux 10 stands in for RHEL 10,
+# proves the script installs WFA and Docker from the live repositories, survives a second run
+# pinned to the installed WFA (the image build's mode), keeps existing Docker data, enforces
+# WFA_FLOOR, and refuses to run without root. AlmaLinux 10 stands in for RHEL 10,
 # whose repositories need a subscription.
 #
 # Exits non-zero, naming the failed check, if anything is wrong.
@@ -52,11 +53,29 @@ rc=$(run first)
 [ "$rc" = 0 ] || { show_tail first; fail "first run exited $rc"; }
 grep -q '^Install complete.' /tmp/first.log || { show_tail first; fail "first run did not reach 'Install complete.'"; }
 
+if [ "$family" = deb ]; then
+  installed=$(dpkg-query -W -f='${Version}' wfa 2>/dev/null) || fail "wfa is not installed after the first run"
+else
+  installed=$(rpm -q --qf '%{VERSION}' wfa 2>/dev/null) || fail "wfa is not installed after the first run"
+fi
+
+# Second run: as the image build runs it, pinned to the version just installed. It must keep
+# existing Docker data, end on exactly that version, and leave no package hold behind.
 install -d /docker
 echo keep > /docker/existing-data
+export WFA_VERSION="$installed" WFA_FLOOR="$installed"
 rc=$(run second)
-[ "$rc" = 0 ] || { show_tail second; fail "second run exited $rc"; }
+unset WFA_VERSION WFA_FLOOR
+[ "$rc" = 0 ] || { show_tail second; fail "pinned second run exited $rc"; }
 [ -f /docker/existing-data ] || fail "second run deleted existing Docker data"
+if [ "$family" = deb ]; then
+  [ -z "$(apt-mark showhold)" ] || fail "the pinned run left packages on hold: $(apt-mark showhold | tr '\n' ' ')"
+fi
+
+# Third run: a floor above any real version must stop the install.
+rc=$(WFA_FLOOR=999.0 run floor)
+[ "$rc" != 0 ] || fail "a WFA_FLOOR above the installed version did not stop the install"
+grep -q "below the required floor 999.0" /tmp/floor.log || { show_tail floor; fail "the floor failure did not say why"; }
 
 useradd -m tester
 su tester -s /bin/bash -c "bash /src/$SCRIPT" > /tmp/nonroot.log 2>&1

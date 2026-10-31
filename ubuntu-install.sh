@@ -34,6 +34,13 @@ if [ "${VERSION_ID:-}" != "24.04" ]; then
   warn "WitFoo appliances are built and tested on Ubuntu 24.04; this system is ${PRETTY_NAME}."
 fi
 
+# Optional pins, set by the WitFoo image build so every image carries a known WFA. Leave them
+# unset on a normal install, which gets the latest WFA.
+#   WFA_VERSION  install exactly this WFA version, and keep it through the system upgrade below
+#   WFA_FLOOR    stop with an error if the installed WFA is older than this
+WFA_VERSION="${WFA_VERSION:-}"
+WFA_FLOOR="${WFA_FLOOR:-}"
+
 # Every apt call is non-interactive, so an unattended run cannot stop at a prompt. Configuration
 # files changed locally are kept on upgrade (--force-confold) rather than prompting.
 export DEBIAN_FRONTEND=noninteractive
@@ -104,8 +111,12 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/witfoo.
 echo "Updating apt repository"
 apt-get update -y
 
-echo "Installing Docker, Docker Compose, and WFA"
-apt-get install "${APT_OPTS[@]}" docker-ce docker-ce-cli containerd.io docker-compose-plugin wfa wfa-helper
+echo "Installing Docker, Docker Compose, and WFA${WFA_VERSION:+ $WFA_VERSION}"
+wfa_pkgs=(wfa wfa-helper)
+if [ -n "$WFA_VERSION" ]; then
+  wfa_pkgs=("wfa=$WFA_VERSION" "wfa-helper=$WFA_VERSION")
+fi
+apt-get install "${APT_OPTS[@]}" docker-ce docker-ce-cli containerd.io docker-compose-plugin "${wfa_pkgs[@]}"
 
 # Guest tools for the platform this system runs on. growpart (cloud-guest-utils) is used by
 # expand-disk.sh everywhere. The rest depends on the hypervisor:
@@ -132,7 +143,24 @@ echo "  platform: ${virt:-unknown}; installing: ${guest_pkgs[*]}"
 apt-get install "${APT_OPTS[@]}" "${guest_pkgs[@]}"
 
 echo "Upgrading system packages"
+if [ -n "$WFA_VERSION" ]; then
+  # Without the hold, the upgrade would replace the pinned WFA with the latest one.
+  apt-mark hold wfa wfa-helper
+fi
 apt-get upgrade "${APT_OPTS[@]}"
+if [ -n "$WFA_VERSION" ]; then
+  apt-mark unhold wfa wfa-helper
+fi
+
+wfa_installed="$(dpkg-query -W -f='${Version}' wfa)"
+if [ -n "$WFA_VERSION" ] && [ "$wfa_installed" != "$WFA_VERSION" ]; then
+  echo "ERROR: WFA $WFA_VERSION was requested but $wfa_installed is installed" >&2
+  exit 1
+fi
+if [ -n "$WFA_FLOOR" ] && ! dpkg --compare-versions "$wfa_installed" ge "$WFA_FLOOR"; then
+  echo "ERROR: installed WFA $wfa_installed is below the required floor $WFA_FLOOR" >&2
+  exit 1
+fi
 
 echo "Restarting Docker"
 systemctl enable docker

@@ -22,6 +22,20 @@ fi
 
 warn() { echo "WARNING: $*" >&2; }
 
+# Optional pins, set by the WitFoo image build so every image carries a known WFA. Leave them
+# unset on a normal install, which gets the latest WFA.
+#   WFA_VERSION  install exactly this WFA version
+#   WFA_FLOOR    stop with an error if the installed WFA is older than this
+WFA_VERSION="${WFA_VERSION:-}"
+WFA_FLOOR="${WFA_FLOOR:-}"
+
+# version_ge A B: true when version A >= version B (numeric, dot-separated).
+version_ge() {
+  local sorted
+  mapfile -t sorted < <(printf '%s\n' "$1" "$2" | sort -V)
+  [ "${sorted[0]}" = "$2" ]
+}
+
 # shellcheck source=/dev/null
 . /etc/os-release
 case "${ID:-}" in
@@ -127,9 +141,18 @@ JOURNAL
 systemctl restart systemd-journald
 
 # WitFoo Appliance Manager
-echo "Installing WitFoo Appliance Manager"
+echo "Installing WitFoo Appliance Manager${WFA_VERSION:+ $WFA_VERSION}"
 dnf config-manager --add-repo https://witfoo-dev.github.io/rpm/witfoo.repo
-dnf install -y wfa
+dnf install -y "wfa${WFA_VERSION:+-$WFA_VERSION}"
+wfa_installed="$(rpm -q --qf '%{VERSION}' wfa)"
+if [ -n "$WFA_VERSION" ] && [ "$wfa_installed" != "$WFA_VERSION" ]; then
+  echo "ERROR: WFA $WFA_VERSION was requested but $wfa_installed is installed" >&2
+  exit 1
+fi
+if [ -n "$WFA_FLOOR" ] && ! version_ge "$wfa_installed" "$WFA_FLOOR"; then
+  echo "ERROR: installed WFA $wfa_installed is below the required floor $WFA_FLOOR" >&2
+  exit 1
+fi
 
 # WitFoo CA certificate.
 #
