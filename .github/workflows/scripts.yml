@@ -1,0 +1,47 @@
+name: Appliance scripts
+
+# The install scripts download from live repositories (Docker, WitFoo apt/rpm) and object
+# storage, so they can break without any change to this repository. The weekly run catches that.
+on:
+  push:
+    branches: [main]
+    paths: ["*.sh", "tests/**", ".github/workflows/scripts.yml"]
+  pull_request:
+    paths: ["*.sh", "tests/**", ".github/workflows/scripts.yml"]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scripts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck --version && shellcheck -x ./*.sh tests/*.sh
+
+  install:
+    needs: shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:24.04
+            script: ubuntu-install.sh
+          # AlmaLinux 10 stands in for RHEL 10, whose repositories need a subscription.
+          - image: almalinux:10
+            script: rhel-install.sh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ${{ matrix.script }} in ${{ matrix.image }}
+        run: tests/install-in-container.sh "${{ matrix.image }}" "${{ matrix.script }}"

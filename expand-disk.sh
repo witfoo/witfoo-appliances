@@ -74,8 +74,10 @@ install_growpart() {
             ;;
         *)
             echo "WARNING: Unknown OS '$OS_ID'. Attempting dnf, then apt..."
+            # Grouped: as `dnf || apt-get update && apt-get install || true`, the apt-get install
+            # also ran after a successful dnf (&& and || have equal precedence, left to right).
             dnf install -y -q cloud-utils-growpart gdisk > /dev/null 2>&1 || \
-            apt-get update -qq && apt-get install -y -qq cloud-guest-utils gdisk > /dev/null 2>&1 || \
+            { apt-get update -qq && apt-get install -y -qq cloud-guest-utils gdisk; } > /dev/null 2>&1 || \
             true
             ;;
     esac
@@ -142,7 +144,7 @@ if command -v lvs &>/dev/null; then
 
         # Verify the LV exists, try mapper path if needed
         if ! lvs "$DATA_LV" &>/dev/null; then
-            MAPPER_VG=$(echo "$DATA_VG" | sed 's/-/--/g')
+            MAPPER_VG="${DATA_VG//-/--}"
             DATA_LV="/dev/mapper/${MAPPER_VG}-${DATA_LV_NAME}"
         fi
 
