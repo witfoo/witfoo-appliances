@@ -93,7 +93,7 @@ systemctl start docker
 
 # Install prerequisite packages
 echo "Installing prerequisite packages"
-dnf install -y curl jq tcpdump wget nano zip unzip openssl
+dnf install -y curl jq tcpdump wget nano zip unzip
 
 # NOTE: `setenforce 0` was removed here. It only changed the RUNTIME mode and did not persist, so
 # every appliance came back SELinux-Enforcing on its first reboot regardless — measured on the
@@ -153,31 +153,6 @@ if [ -n "$WFA_FLOOR" ] && ! version_ge "$wfa_installed" "$WFA_FLOOR"; then
   echo "ERROR: installed WFA $wfa_installed is below the required floor $WFA_FLOOR" >&2
   exit 1
 fi
-
-# WitFoo CA certificate.
-#
-# WFA keeps its own CA bundle in /witfoo/certs for WitFoo-to-WitFoo TLS. This step also adds the
-# 2024 WitFoo CA to the system trust store. When the download failed, `set -e` aborted the whole
-# install here, on its last step, after everything else had been installed. The certificate is
-# now installed only if it is fetched over verified TLS and decodes to an X.509 CA certificate;
-# otherwise the install continues without it and says so, rather than installing whatever came
-# back or failing an install that is otherwise complete.
-WITFOO_CA_URL="https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt"
-echo "Updating CA Trust with WitFoo CA"
-ca_tmp="$(mktemp -d)"
-if curl -fsSL --retry 3 --max-time 60 "$WITFOO_CA_URL" -o "$ca_tmp/ca.b64" &&
-  base64 -d "$ca_tmp/ca.b64" > "$ca_tmp/ca.crt" 2>/dev/null &&
-  ca_text="$(openssl x509 -in "$ca_tmp/ca.crt" -noout -text 2>/dev/null)" &&
-  [[ "$ca_text" == *"CA:TRUE"* ]]; then
-  install -d -m 0755 /witfoo
-  install -m 0644 "$ca_tmp/ca.crt" /witfoo/witfoo_ca_2024.crt
-  install -m 0644 "$ca_tmp/ca.crt" /etc/pki/ca-trust/source/anchors/witfoo_ca_2024.crt
-  update-ca-trust
-else
-  warn "the WitFoo CA certificate could not be downloaded or is not a valid CA certificate;"
-  warn "it was NOT added to the system trust store. WFA's own CA bundle is not affected."
-fi
-rm -rf "$ca_tmp"
 
 echo
 echo "Install complete."

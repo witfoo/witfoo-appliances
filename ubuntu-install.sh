@@ -62,7 +62,7 @@ apt-get update -y
 
 echo "Installing prerequisite packages"
 apt-get install "${APT_OPTS[@]}" apt-transport-https ca-certificates curl gnupg-agent gnupg lsb-release \
-  software-properties-common iotop htop jq update-motd tcpdump wget nano zip unzip net-tools openssl
+  software-properties-common iotop htop jq update-motd tcpdump wget nano zip unzip net-tools
 
 # Bound the log footprint BEFORE anything starts writing. A dedicated 5 GB /var/log can fill up
 # before WFA is configured; WFA 2.4.16 and later writes this same file on every start, so this
@@ -165,31 +165,6 @@ fi
 echo "Restarting Docker"
 systemctl enable docker
 systemctl restart docker
-
-# WitFoo CA certificate.
-#
-# WFA keeps its own CA bundle in /witfoo/certs for WitFoo-to-WitFoo TLS. This step also adds the
-# 2024 WitFoo CA to the system trust store. It was downloaded with `curl -k`, i.e. with TLS
-# verification off, for a file that then became a trusted root on this system. It is now
-# fetched over verified TLS and installed only if it decodes to an X.509 CA certificate.
-# If it cannot be fetched, the install continues without it and says so, rather than installing
-# whatever came back.
-WITFOO_CA_URL="https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt"
-echo "Installing the WitFoo CA certificate"
-ca_tmp="$(mktemp -d)"
-if curl -fsSL --retry 3 --max-time 60 "$WITFOO_CA_URL" -o "$ca_tmp/ca.b64" &&
-  base64 -d "$ca_tmp/ca.b64" > "$ca_tmp/ca.crt" 2>/dev/null &&
-  ca_text="$(openssl x509 -in "$ca_tmp/ca.crt" -noout -text 2>/dev/null)" &&
-  [[ "$ca_text" == *"CA:TRUE"* ]]; then
-  install -d -m 0755 /witfoo
-  install -m 0644 "$ca_tmp/ca.crt" /witfoo/witfoo_ca_2024.crt
-  install -m 0644 "$ca_tmp/ca.crt" /usr/local/share/ca-certificates/witfoo_ca_2024.crt
-  update-ca-certificates
-else
-  warn "the WitFoo CA certificate could not be downloaded or is not a valid CA certificate;"
-  warn "it was NOT added to the system trust store. WFA's own CA bundle is not affected."
-fi
-rm -rf "$ca_tmp"
 
 echo
 echo "Install complete."
