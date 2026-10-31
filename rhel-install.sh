@@ -20,6 +20,26 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+warn() { echo "WARNING: $*" >&2; }
+
+# shellcheck source=/dev/null
+. /etc/os-release
+case "${ID:-}" in
+  rhel) ;;
+  *) warn "this script is written for RHEL 10; this system is ${PRETTY_NAME:-unknown}." ;;
+esac
+
+echo "Checking the partition layout"
+missing_mounts=()
+for m in /docker /var/log /var/log/audit /cassandra_commit /data; do
+  mountpoint -q "$m" || missing_mounts+=("$m")
+done
+if [ "${#missing_mounts[@]}" -gt 0 ]; then
+  warn "these paths are not separate volumes: ${missing_mounts[*]}"
+  warn "WitFoo services will run, but one volume filling up can starve the others."
+  warn "See \"Disk Partition Layout\" in README.md."
+fi
+
 # Update the system and install prerequisite packages
 echo "Updating system and installing prerequisite packages"
 dnf update -y
@@ -59,7 +79,7 @@ systemctl start docker
 
 # Install prerequisite packages
 echo "Installing prerequisite packages"
-dnf install -y curl jq tcpdump wget nano zip unzip
+dnf install -y curl jq tcpdump wget nano zip unzip openssl
 
 # NOTE: `setenforce 0` was removed here. It only changed the RUNTIME mode and did not persist, so
 # every appliance came back SELinux-Enforcing on its first reboot regardless — measured on the
@@ -67,12 +87,20 @@ dnf install -y curl jq tcpdump wget nano zip unzip
 # correctly. The line therefore did nothing durable while implying the opposite. If a genuine
 # SELinux exception is ever needed, it belongs in a policy module, not a non-persistent toggle.
 
-# Cloud/VM Tools
+# Cloud/VM Tools. growpart (cloud-utils-growpart) is used by expand-disk.sh everywhere; the
+# rest depends on the hypervisor: Hyper-V KVP/VSS daemons, open-vm-tools, or qemu-guest-agent.
+# NOTE: `linux-cloud-tools-$(uname -r)` was removed earlier. That is a Debian/Ubuntu package name
+# and has never existed in any RHEL repository; hyperv-daemons is the RHEL equivalent.
 echo "Installing Cloud/VM Tools"
-dnf install -y cloud-utils-growpart
-# NOTE: `linux-cloud-tools-$(uname -r)` was removed. That is a Debian/Ubuntu package name and has
-# never existed in any RHEL repository — verified against a live RHEL 10.1 appliance. Without
-# `set -e` it failed silently on every run since the script was written.
+guest_pkgs=(cloud-utils-growpart)
+virt="$(systemd-detect-virt 2>/dev/null || true)"
+case "$virt" in
+  microsoft) guest_pkgs+=(hyperv-daemons) ;;
+  vmware) guest_pkgs+=(open-vm-tools) ;;
+  kvm | qemu) guest_pkgs+=(qemu-guest-agent) ;;
+esac
+echo "  platform: ${virt:-unknown}; installing: ${guest_pkgs[*]}"
+dnf install -y "${guest_pkgs[@]}"
 
 # Bound the log footprint BEFORE anything starts writing.
 #
@@ -103,12 +131,30 @@ echo "Installing WitFoo Appliance Manager"
 dnf config-manager --add-repo https://witfoo-dev.github.io/rpm/witfoo.repo
 dnf install -y wfa
 
-# Update CA Trust with WitFoo CA
+# WitFoo CA certificate.
+#
+# WFA keeps its own CA bundle in /witfoo/certs for WitFoo-to-WitFoo TLS. This step also adds the
+# 2024 WitFoo CA to the system trust store. When the download failed, `set -e` aborted the whole
+# install here, on its last step, after everything else had been installed. The certificate is
+# now installed only if it is fetched over verified TLS and decodes to an X.509 CA certificate;
+# otherwise the install continues without it and says so, rather than installing whatever came
+# back or failing an install that is otherwise complete.
+WITFOO_CA_URL="https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt"
 echo "Updating CA Trust with WitFoo CA"
-curl -fsSL https://objectstorage.us-chicago-1.oraclecloud.com/n/ax4xtzq35yny/b/VM-Images/o/witfoo_2024_ca.crt \
-  | base64 -d > /witfoo/witfoo_ca_2024.crt
-cp /witfoo/witfoo_ca_2024.crt /etc/pki/ca-trust/source/anchors/
-update-ca-trust
+ca_tmp="$(mktemp -d)"
+if curl -fsSL --retry 3 --max-time 60 "$WITFOO_CA_URL" -o "$ca_tmp/ca.b64" &&
+  base64 -d "$ca_tmp/ca.b64" > "$ca_tmp/ca.crt" 2>/dev/null &&
+  ca_text="$(openssl x509 -in "$ca_tmp/ca.crt" -noout -text 2>/dev/null)" &&
+  [[ "$ca_text" == *"CA:TRUE"* ]]; then
+  install -d -m 0755 /witfoo
+  install -m 0644 "$ca_tmp/ca.crt" /witfoo/witfoo_ca_2024.crt
+  install -m 0644 "$ca_tmp/ca.crt" /etc/pki/ca-trust/source/anchors/witfoo_ca_2024.crt
+  update-ca-trust
+else
+  warn "the WitFoo CA certificate could not be downloaded or is not a valid CA certificate;"
+  warn "it was NOT added to the system trust store. WFA's own CA bundle is not affected."
+fi
+rm -rf "$ca_tmp"
 
 echo
 echo "Install complete."
