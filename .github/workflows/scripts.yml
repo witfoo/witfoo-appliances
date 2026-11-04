@@ -45,3 +45,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install ${{ matrix.script }} in ${{ matrix.image }}
         run: tests/install-in-container.sh "${{ matrix.image }}" "${{ matrix.script }}"
+
+  expand-disk:
+    needs: shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # AlmaLinux 10 stands in for RHEL 10.
+        image: ["ubuntu:24.04", "almalinux:10"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: expand-disk.sh on loop devices in ${{ matrix.image }}
+        run: tests/expand-disk-in-container.sh "${{ matrix.image }}"
